@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package pb;
+
+import "google/api/annotations.proto";
+
+import "rpc_cart.proto";
+import "protoc-gen-openapiv2/options/annotations.proto";
+
+option go_package = "github.com/farhandwian/microservice/pb";
+
+
+service CartService {
+    rpc CreateCart(AddCartRequest) returns (AddCartResponse) {
+        option (google.api.http) = {
+            post: "/v1/add_Cart"
+            body: "*"
+        };
+        option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+            description: "Use this API to create a new Cart";
+            summary: "Adding new Cart";
+        };
+    }
+    rpc GetCart(GetCartRequest) returns (GetCartResponse) {
+        option (google.api.http) = {
+            get: "/v1/get_Cart"
+        };
+        option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+            description: "Use this API to create a get Cart";
+            summary: "Get Cart";
+        };
+    }
+    rpc DeleteCart(DeleteCartRequest) returns (DeleteCartResponse) {
+        option (google.api.http) = {
+            post: "/v1/delete_Cart"
+            body: "*"
+        };
+        option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+            description: "Use this API to delete a Cart";
+            summary: "Delete Cart";
+        };
+    }
+  }

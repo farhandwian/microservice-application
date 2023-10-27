@@ -1,0 +1,32 @@
+{
+    "productName" : "Tesla M123",
+    "price" : 1000000000,
+    "description" : "Tesla Model 3",
+    "amounts" : 1
+}
+
+evans cli untuk ngetes grpc
+
+basic auth
+usernma:farhan
+pass:abc123
+
+Basic ZmFyaGFuOmFiYzEyMw==
+
+liat file ini untuk ngeliat interface yang harus di implementasi di be service_cart_grpc.pb.go
+
+// CartServiceServer is the server API for CartService service.
+// All implementations must embed UnimplementedCartServiceServer
+// for forward compatibility
+type CartServiceServer interface {
+	CreateCart(context.Context, *AddCartRequest) (*AddCartResponse, error)
+	GetCart(context.Context, *GetCartRequest) (*GetCartResponse, error)
+	DeleteCart(context.Context, *DeleteCartRequest) (*DeleteCartResponse, error)
+	mustEmbedUnimplementedCartServiceServer()
+}
+
+// UnimplementedCartServiceServer must be embedded to have forward compatible implementations.
+type UnimplementedCartServiceServer struct {
+}
+
+masih ada error pada pemakaian env nya,di util.LoadConfig
