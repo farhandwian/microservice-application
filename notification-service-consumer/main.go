@@ -1,23 +1,48 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/smtp"
 	"sync"
 
+	firebase "firebase.google.com/go"
 	"github.com/confluentinc/confluent-kafka-go/kafka"
+
+	// "firebase.google.com/go/v4/messaging"
+	"firebase.google.com/go/messaging"
+	"google.golang.org/api/option"
 )
 
-type Message struct {
-	Typee   string `json:"type"`
+type MessageType string
+
+const (
+	TypeEmail    MessageType = "email"
+	TypeFirebase MessageType = "firebase"
+)
+
+type MessageContent interface{}
+
+type EmailContent struct {
 	Message string `json:"message"`
-	To      string `json:"email"`
+	To      string `json:"to"`
 }
 
-func sendEmail(msg Message) {
-	go func(msg Message) {
+type FirebaseContent struct {
+	Message string `json:"message"`
+	To      string `json:"to"`
+	Token   string `json:"token"`
+}
+
+type Message struct {
+	Type    MessageType    `json:"type"`
+	Content MessageContent `json:"content"`
+}
+
+func sendEmail(msg EmailContent) {
+	go func(msg EmailContent) {
 		from := "dwyanfarhan@gmail.com"
 		password := "yvgogxiooxpbqrdo"
 		to := msg.To
@@ -36,9 +61,73 @@ func sendEmail(msg Message) {
 			log.Printf("Failed to send email: %v", err)
 			return
 		}
-
 		fmt.Println("Email sent!")
 	}(msg)
+}
+
+func SendPushNotification(deviceTokens string) error {
+	opt := option.WithCredentialsFile("serviceAccountKey.json")
+
+	app, err := firebase.NewApp(context.Background(), nil, opt)
+
+	if err != nil {
+		log.Printf("Error in initializing firebase : %s", err)
+		return err
+	}
+
+	fcmClient, err := app.Messaging(context.Background())
+
+	if err != nil {
+		return err
+	}
+
+	message := &messaging.Message{
+		Notification: &messaging.Notification{
+			Title: "Congratulations!!",
+			Body:  "You have just implemented push notification",
+		},
+		Token: deviceTokens,
+	}
+
+	_, err = fcmClient.Send(context.Background(), message)
+	if err != nil {
+		return err
+	}
+
+	log.Println("Push notification sent to single device!")
+
+	return nil
+}
+
+func (m *Message) UnmarshalJSON(data []byte) error {
+	type Alias Message
+
+	aux := &struct {
+		Content json.RawMessage `json:"content"`
+		*Alias
+	}{
+		Alias: (*Alias)(m),
+	}
+
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	switch m.Type {
+	case TypeEmail:
+		var emailContent EmailContent
+		if err := json.Unmarshal(aux.Content, &emailContent); err != nil {
+			return err
+		}
+		m.Content = emailContent
+	case TypeFirebase:
+		var firebaseContent FirebaseContent
+		if err := json.Unmarshal(aux.Content, &firebaseContent); err != nil {
+			return err
+		}
+		m.Content = firebaseContent
+	}
+	return nil
 }
 
 func startConsumer(instanceID int, wg *sync.WaitGroup) {
@@ -63,15 +152,28 @@ func startConsumer(instanceID int, wg *sync.WaitGroup) {
 			fmt.Printf("Consumer %d: Read message with value %s from partition %d\n", instanceID, string(msg.Value), msg.TopicPartition.Partition)
 			continue
 		}
-
 		var decode_msg Message
 		if err := json.Unmarshal(msg.Value, &decode_msg); err != nil {
 			fmt.Println("Error decoding message:", err)
 			continue
 		}
 
-		fmt.Println(decode_msg)
-		sendEmail(decode_msg)
+		switch decode_msg.Type {
+		case TypeEmail:
+			if content, valid := decode_msg.Content.(EmailContent); valid {
+				sendEmail(content)
+			} else {
+				fmt.Println("error decode message")
+			}
+		case TypeFirebase:
+			if content, valid := decode_msg.Content.(FirebaseContent); valid {
+				SendPushNotification(content.Token) // adjust the function to handle a single token or change the way you pass tokens
+			} else {
+				fmt.Println("error decode message")
+			}
+		default:
+			fmt.Printf("Unknown message type: %s\n", decode_msg.Type)
+		}
 	}
 }
 
