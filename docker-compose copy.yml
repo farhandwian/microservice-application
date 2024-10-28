@@ -1,0 +1,53 @@
+version: "3.7"
+name: notification-service-core
+services:
+  go-kafka-zookeeper-core:
+    image: confluentinc/cp-zookeeper
+    container_name: go-kafka-zookeeper-core
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+    ports:
+      - "2181:2181"
+    networks:
+      - go-kafka-net
+  go-kafka-broker-core:
+    image: confluentinc/cp-kafka
+    container_name: go-kafka-broker-core
+    environment:
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://go-kafka-broker-core:9092
+      KAFKA_ZOOKEEPER_CONNECT: go-kafka-zookeeper-core:2181
+    expose:
+      - "9092"
+    ports:
+      - "9092:9092"
+    networks:
+      - go-kafka-net
+  go-kafka-producer-core:
+    container_name: go-kafka-producer-core
+    build: ./notification-service-producer
+    environment:
+      - KAFKA_BROKER=go-kafka-broker-core:9092
+      - KAFKA_TOPIC=notifications
+    volumes:
+      - ./:/go/src/project
+    depends_on:
+      - go-kafka-broker-core
+      - go-kafka-zookeeper-core
+    networks:
+      - go-kafka-net
+  go-kafka-consumer-core:
+    container_name: go-kafka-consumer-core
+    build: ./notification-service-consumer
+    environment:
+      - KAFKA_BROKER=go-kafka-broker-core:9092
+      - KAFKA_TOPIC=notifications
+    volumes:
+      - ./:/go/src/project
+    depends_on:
+      - go-kafka-broker-core
+      - go-kafka-zookeeper-core
+    networks:
+      - go-kafka-net
+networks:
+  go-kafka-net:
+    driver: bridge

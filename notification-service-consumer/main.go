@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/smtp"
+	"os"
 	"sync"
 
 	firebase "firebase.google.com/go"
@@ -21,6 +22,11 @@ type MessageType string
 const (
 	TypeEmail    MessageType = "email"
 	TypeFirebase MessageType = "firebase"
+)
+
+var (
+	kafkaServer string
+	kafkaTopic  string
 )
 
 type MessageContent interface{}
@@ -39,6 +45,14 @@ type FirebaseContent struct {
 type Message struct {
 	Type    MessageType    `json:"type"`
 	Content MessageContent `json:"content"`
+}
+
+func init() {
+	kafkaServer = readFromENV("KAFKA_BROKER", "localhost:9092")
+	kafkaTopic = readFromENV("KAFKA_TOPIC", "notifications")
+
+	fmt.Println("Kafka Broker - ", kafkaServer)
+	fmt.Println("Kafka topic - ", kafkaTopic)
 }
 
 func sendEmail(msg EmailContent) {
@@ -133,7 +147,7 @@ func (m *Message) UnmarshalJSON(data []byte) error {
 func startConsumer(instanceID int, wg *sync.WaitGroup) {
 	defer wg.Done()
 	config := &kafka.ConfigMap{
-		"bootstrap.servers": "localhost:9092",
+		"bootstrap.servers": kafkaServer,
 		"group.id":          "test_group",
 		"auto.offset.reset": "earliest",
 	}
@@ -144,7 +158,7 @@ func startConsumer(instanceID int, wg *sync.WaitGroup) {
 	}
 	defer consumer.Close()
 
-	consumer.Subscribe(topic, nil)
+	consumer.Subscribe(kafkaTopic, nil)
 
 	for {
 		msg, err := consumer.ReadMessage(-1)
@@ -167,7 +181,7 @@ func startConsumer(instanceID int, wg *sync.WaitGroup) {
 			}
 		case TypeFirebase:
 			if content, valid := decode_msg.Content.(FirebaseContent); valid {
-				SendPushNotification(content.Token) // adjust the function to handle a single token or change the way you pass tokens
+				SendPushNotification(content.Token)
 			} else {
 				fmt.Println("error decode message")
 			}
@@ -187,4 +201,10 @@ func main() {
 	wg.Wait()
 }
 
-var topic = "notifications"
+func readFromENV(key, defaultVal string) string {
+	value := os.Getenv(key)
+	if value == "" {
+		return defaultVal
+	}
+	return value
+}

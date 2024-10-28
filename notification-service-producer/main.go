@@ -2,6 +2,8 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
+	"os"
 	"time"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
@@ -12,6 +14,11 @@ type MessageType string
 const (
 	TypeEmail    MessageType = "email"
 	TypeFirebase MessageType = "firebase"
+)
+
+var (
+	kafkaServer string
+	kafkaTopic  string
 )
 
 type MessageContent interface{}
@@ -32,10 +39,18 @@ type Message struct {
 	Content MessageContent `json:"content"`
 }
 
+func init() {
+	kafkaServer = readFromENV("KAFKA_BROKER", "localhost:9092")
+	kafkaTopic = readFromENV("KAFKA_TOPIC", "notifications")
+
+	fmt.Println("Kafka Broker - ", kafkaServer)
+	fmt.Println("Kafka topic - ", kafkaTopic)
+}
+
 func produce(p *kafka.Producer) {
 	defer p.Close()
 
-	endTime := time.Now().Add(15 * time.Second)
+	endTime := time.Now().Add(1000 * time.Second)
 	content := &EmailContent{
 		Message: "anda berhasil membeli produk saos abc seharga 15000",
 		To:      "dwyanfarhan123@gmail.com",
@@ -74,7 +89,7 @@ func produce(p *kafka.Producer) {
 
 		message := &kafka.Message{
 			TopicPartition: kafka.TopicPartition{
-				Topic:     &Topic,
+				Topic:     &kafkaTopic,
 				Partition: kafka.PartitionAny,
 			},
 			Value: jsonData,
@@ -85,12 +100,12 @@ func produce(p *kafka.Producer) {
 		time.Sleep(1 * time.Second)
 	}
 
-	p.Flush(15 * 1000)
+	p.Flush(1000 * 1000)
 }
 
 func main() {
 	config := &kafka.ConfigMap{
-		"bootstrap.servers": "localhost:9092",
+		"bootstrap.servers": kafkaServer,
 	}
 
 	producer, err := kafka.NewProducer(config)
@@ -100,4 +115,10 @@ func main() {
 	produce(producer)
 }
 
-var Topic = "notifications"
+func readFromENV(key, defaultVal string) string {
+	value := os.Getenv(key)
+	if value == "" {
+		return defaultVal
+	}
+	return value
+}
